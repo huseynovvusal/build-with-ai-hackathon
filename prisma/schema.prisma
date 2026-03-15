@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(uuid())
+  name              String
+  email             String    @unique
+  passwordHash      String
+  githubUsername    String?
+  role              String    @default("member") // member, organizer, admin
+  timezone          String?
+  availabilityHours Int?      @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastActiveAt      DateTime?
+  isDisabled        Boolean   @default(false)
+
+  skills            UserSkill[]
+  ownedProjects     Project[] @relation("ProjectOwner")
+  projectMembers    ProjectTeamMember[]
+  invites           Invite[]
+  auditLogs         AuditLog[]
+}
+
+model Skill {
+  id    String      @id @default(uuid())
+  name  String      @unique
+  users UserSkill[]
+}
+
+model UserSkill {
+  userId  String
+  skillId String
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([userId, skillId])
+}
+
+model Project {
+  id              String   @id @default(uuid())
+  title           String
+  description     String
+  ownerId         String
+  mustHaveTech    String   // Comma-separated or JSON string
+  rolesNeeded     String   // Comma-separated or JSON string
+  teamSize        Int
+  status          String   @default("draft") // draft, recruiting, active, completed
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  owner           User     @relation("ProjectOwner", fields: [ownerId], references: [id])
+  recommendations ProjectRecommendation[]
+  teamMembers     ProjectTeamMember[]
+  invites         Invite[]
+}
+
+model ProjectRecommendation {
+  id        String   @id @default(uuid())
+  projectId String
+  variant   String   // A, B, C
+  createdAt DateTime @default(now())
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ProjectTeamMember {
+  id           String   @id @default(uuid())
+  projectId    String
+  userId       String
+  assignedRole String
+  score        Float
+  status       String   @default("proposed") // proposed, approved
+
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Invite {
+  id        String   @id @default(uuid())
+  projectId String
+  userId    String
+  message   String
+  status    String   @default("pending") // pending, accepted, declined
+  createdAt DateTime @default(now())
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorUserId  String?
+  action       String
+  metadataJson String?
+  createdAt    DateTime @default(now())
+
+  actorUser    User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+}
