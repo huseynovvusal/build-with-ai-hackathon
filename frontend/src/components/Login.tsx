@@ -4,7 +4,7 @@ import { Github, Sparkles, BrainCircuit, Activity, BookOpen, Fingerprint } from 
 export function Login() {
   const handleGithubLogin = () => {
     const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID || 'your_github_client_id_here';
-    const redirectUri = window.location.origin + '/auth/callback';
+    const redirectUri = import.meta.env.VITE_GITHUB_REDIRECT_URI || (window.location.origin + '/auth/callback');
     window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=read:user%20repo%20read:org`;
   };
 

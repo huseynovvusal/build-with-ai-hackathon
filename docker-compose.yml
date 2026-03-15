@@ -76,6 +76,7 @@ services:
       - "5173:5173"
     environment:
       - VITE_GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - VITE_GITHUB_REDIRECT_URI=${GITHUB_REDIRECT_URI}
     networks:
       - communa_network
     depends_on:
