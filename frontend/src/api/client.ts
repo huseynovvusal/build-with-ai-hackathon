@@ -1,4 +1,5 @@
-export const API_BASE_URL = 'http://localhost:8000/api';
+const envApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
+export const API_BASE_URL = envApiBaseUrl;
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem('token_access');
