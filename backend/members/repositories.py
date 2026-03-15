@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from typing import Iterable
 
-from members.models import Member, ProjectProposal, TeamAssignment
+from django.db.models import QuerySet
+
+from members.models import Member, ProjectProposal, TeamAssignment, Project, ProjectMember
 
 
 class MemberRepository:
     @staticmethod
-    def list_members() -> list[Member]:
-        return list(Member.objects.all())
+    def list_members() -> QuerySet[Member]:
+        return Member.objects.all()
 
     @staticmethod
     def upsert_member(
@@ -35,8 +37,8 @@ class MemberRepository:
 
 class ProjectProposalRepository:
     @staticmethod
-    def list_proposals() -> list[ProjectProposal]:
-        return list(ProjectProposal.objects.prefetch_related("team_assignments__member"))
+    def list_proposals() -> QuerySet[ProjectProposal]:
+        return ProjectProposal.objects.prefetch_related("team_assignments__member")
 
     @staticmethod
     def upsert_proposal(*, title: str, description: str, ai_reasoning: str) -> ProjectProposal:
@@ -68,3 +70,24 @@ class TeamAssignmentRepository:
                 project_proposal=project,
                 defaults={"role": role},
             )
+
+
+class ProjectRepository:
+    @staticmethod
+    def list_projects() -> QuerySet[Project]:
+        return Project.objects.prefetch_related("project_members__member", "creator")
+
+    @staticmethod
+    def create_project(
+        *,
+        title: str,
+        description: str,
+        required_skills: list[str],
+        creator: Member | None = None,
+    ) -> Project:
+        return Project.objects.create(
+            title=title,
+            description=description,
+            required_skills=required_skills,
+            creator=creator,
+        )

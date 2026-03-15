@@ -1,17 +1,32 @@
-import React, { useState } from 'react';
-import { mockMembers } from '../mockData';
-import { Trophy, TrendingUp, TrendingDown, Minus, GitCommit, GitPullRequest, CircleDot, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Trophy, TrendingUp, GitCommit, Search, Activity } from 'lucide-react';
+import { membersApi } from '../api/members';
 
 type Timeframe = 'weekly' | 'monthly' | 'lifetime';
 
-interface MeritocracyTableProps {
-  isLoading?: boolean;
-}
+export function MeritocracyTable() {
+  const [members, setMembers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [timeframe, setTimeframe] = useState<Timeframe>('weekly'); // Keep timeframe state if needed for other parts
 
-export function MeritocracyTable({ isLoading }: MeritocracyTableProps = {}) {
-  const [timeframe, setTimeframe] = useState<Timeframe>('weekly');
+  useEffect(() => {
+    const fetchMembers = async () => {
+      try {
+        const data = await membersApi.list();
+        // Sort by impact score descending
+        const sorted = data.sort((a: any, b: any) => Number(b.impact_score) - Number(a.impact_score));
+        setMembers(sorted);
+      } catch (err) {
+        console.error('Failed to fetch members:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchMembers();
+  }, []);
 
-  const sortedMembers = [...mockMembers].sort((a, b) => b.stats[timeframe].score - a.stats[timeframe].score);
+  // The sortedMembers based on mockData and timeframe is no longer relevant if using live data
+  // const sortedMembers = [...mockMembers].sort((a, b) => b.stats[timeframe].score - a.stats[timeframe].score);
 
   if (isLoading) {
     return (
@@ -46,7 +61,7 @@ export function MeritocracyTable({ isLoading }: MeritocracyTableProps = {}) {
           <p className="text-slate-500 font-mono text-sm mt-2">Data-driven contributor rankings based on impact and activity</p>
         </div>
         
-        {/* Timeframe Selector */}
+        {/* Timeframe Selector (kept for now, but might be removed if not used with live data) */}
         <div className="flex border-2 border-slate-900 bg-white">
           {(['weekly', 'monthly', 'lifetime'] as Timeframe[]).map((tf) => (
             <button
@@ -77,25 +92,24 @@ export function MeritocracyTable({ isLoading }: MeritocracyTableProps = {}) {
               </th>
               <th className="p-4 font-bold uppercase text-xs tracking-wider text-slate-500 border-r-2 border-slate-900 text-right">
                 <div className="flex items-center justify-end gap-2">
-                  <GitPullRequest className="w-4 h-4" /> PRs Merged
+                  <Search className="w-4 h-4" /> PRs Merged
                 </div>
               </th>
               <th className="p-4 font-bold uppercase text-xs tracking-wider text-slate-500 border-r-2 border-slate-900 text-right">
                 <div className="flex items-center justify-end gap-2">
-                  <CircleDot className="w-4 h-4" /> Issues
+                  <Activity className="w-4 h-4" /> Issues
                 </div>
               </th>
               <th className="p-4 font-bold uppercase text-xs tracking-wider text-slate-500 border-r-2 border-slate-900 text-right">
                 <div className="flex items-center justify-end gap-2">
-                  <MessageSquare className="w-4 h-4" /> Reviews
+                  <Activity className="w-4 h-4" /> Reviews
                 </div>
               </th>
               <th className="p-4 font-bold uppercase text-xs tracking-wider text-slate-900 text-right bg-amber-50">Impact Score</th>
             </tr>
           </thead>
           <tbody>
-            {sortedMembers.map((member, index) => {
-              const stats = member.stats[timeframe];
+            {members.map((member, index) => {
               const isTop3 = index < 3;
               
               return (
@@ -111,26 +125,24 @@ export function MeritocracyTable({ isLoading }: MeritocracyTableProps = {}) {
                   </td>
                   <td className="p-4 border-r-2 border-slate-900">
                     <div className="flex items-center gap-3">
-                      <img src={member.avatar} alt={member.name} className="w-10 h-10 border-2 border-slate-900 bg-white" />
+                      <img src={member.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.github_id}`} alt={member.name} className="w-10 h-10 border-2 border-slate-900 bg-white" />
                       <div>
                         <div className="font-bold text-sm flex items-center gap-2">
                           {member.name}
                           {isTop3 && <Trophy className={`w-3 h-3 ${index === 0 ? 'text-amber-500' : index === 1 ? 'text-slate-400' : 'text-amber-700'}`} />}
                         </div>
-                        <div className="font-mono text-[10px] text-slate-500">{member.handle}</div>
+                        <div className="font-mono text-[10px] text-slate-500">{member.github_id}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">{stats.commits}</td>
-                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">{stats.prs}</td>
-                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">{stats.issues}</td>
-                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">{stats.reviews}</td>
+                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">-</td>
+                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">-</td>
+                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">-</td>
+                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">-</td>
                   <td className="p-4 text-right bg-amber-50/30">
                     <div className="flex items-center justify-end gap-3">
-                      {index === 0 ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : 
-                       index > 2 ? <TrendingDown className="w-4 h-4 text-red-500" /> : 
-                       <Minus className="w-4 h-4 text-slate-400" />}
-                      <span className="font-mono font-bold text-lg text-blue-600">{stats.score}</span>
+                      <TrendingUp className="w-4 h-4 text-emerald-500" />
+                      <span className="font-mono font-bold text-lg text-blue-600">{Number(member.impact_score).toFixed(0)}</span>
                     </div>
                   </td>
                 </tr>

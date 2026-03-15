@@ -6,6 +6,8 @@ from members.views import (
     ProposalListView,
     SyncLogsView,
     SyncOrganizationView,
+    ProjectListView,
+    ProjectCreateView,
 )
 
 urlpatterns = [
@@ -18,4 +20,6 @@ urlpatterns = [
         ActivateProposalView.as_view(),
         name="activate-proposal",
     ),
+    path("projects/", ProjectListView.as_view(), name="project-list-all"),
+    path("projects/create/", ProjectCreateView.as_view(), name="project-create"),
 ]

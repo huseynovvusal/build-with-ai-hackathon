@@ -1,0 +1,26 @@
+from __future__ import annotations
+
+from django.contrib.auth.models import User
+from rest_framework import serializers
+
+from members.models import Member
+
+
+class MemberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Member
+        fields = [
+            "id",
+            "github_id",
+            "name",
+            "bio",
+            "avatar_url",
+            "top_skills",
+            "impact_score",
+        ]
+
+
+class AuthResponseSerializer(serializers.Serializer):
+    access = serializers.CharField()
+    refresh = serializers.CharField()
+    member = MemberSerializer()
