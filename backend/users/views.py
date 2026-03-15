@@ -1,19 +1,22 @@
 from __future__ import annotations
 
+import json
+import time
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from members.models import Member
-from members.services import GithubSyncService
+from users.analysis_worker import start_member_analysis_async
 from users.github_oauth import GitHubOAuthService
-from users.github_scraper import GitHubScraperService
-from users.serializers import MemberSerializer, AuthResponseSerializer
+from users.serializers import MemberSerializer
 
 
 def _get_tokens_for_user(user: User) -> dict:
@@ -81,20 +84,7 @@ class GitHubCallbackView(APIView):
         except Exception as exc:
             print(f"DEBUG [Auth]: Could not fetch organizations: {exc}")
 
-        # 3. Scrape repos for skills + impact score
-        scraped = GitHubScraperService.scrape(
-            username=github_login,
-            access_token=gh_token,
-            organization_login=organization_login or None,
-        )
-        top_skills = scraped["top_skills"]
-        impact_score = scraped["impact_score"]
-        commits_count = int(scraped.get("commits_count", 0) or 0)
-        prs_merged_count = int(scraped.get("prs_merged_count", 0) or 0)
-        issues_count = int(scraped.get("issues_count", 0) or 0)
-        reviews_count = int(scraped.get("reviews_count", 0) or 0)
-
-        # 4. Upsert Django User + Member (atomic)
+        # 3. Fast upsert Django User + Member (defer heavy sync/analysis to background)
         with transaction.atomic():
             user, _ = User.objects.get_or_create(
                 username=f"gh_{github_id}",
@@ -109,25 +99,28 @@ class GitHubCallbackView(APIView):
                     "avatar_url": avatar_url,
                     "company": company,
                     "organization_login": organization_login,
-                    "top_skills": top_skills,
+                    "top_skills": [],
                     "roles": [gh_profile.get("type", "Contributor")],
-                    "impact_score": impact_score,
-                    "commits_count": commits_count,
-                    "prs_merged_count": prs_merged_count,
-                    "issues_count": issues_count,
-                    "reviews_count": reviews_count,
+                    "impact_score": 0.0,
+                    "commits_count": 0,
+                    "prs_merged_count": 0,
+                    "issues_count": 0,
+                    "reviews_count": 0,
                     "github_token": gh_token,
+                    "is_analyzing": True,
+                    "analysis_status": Member.AnalysisStatus.RUNNING,
+                    "analysis_progress": 1,
+                    "analysis_message": "Authentication complete. Starting analysis...",
                 },
             )
 
-        # 4.1 Sync all members from the same organization, if available
-        if organization_login:
-            try:
-                GithubSyncService.sync_organization(org_name=organization_login, access_token=gh_token)
-                # Reload self member after org sync in case upsert updated it
-                member = Member.objects.get(github_id=github_id)
-            except Exception as exc:
-                print(f"DEBUG [Auth]: Organization sync failed for {organization_login}: {exc}")
+        # 3.1 Start background analysis/sync without blocking login UX
+        start_member_analysis_async(
+            member_id=member.id,
+            github_login=github_login,
+            access_token=gh_token,
+            organization_login=organization_login,
+        )
 
         # 5. Issue JWT
         tokens = _get_tokens_for_user(user)
@@ -158,6 +151,56 @@ class MeView(APIView):
             return Response({"error": "Member profile not found"}, status=status.HTTP_404_NOT_FOUND)
         serializer = MemberSerializer(member)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class MeStreamView(APIView):
+    """
+    GET /api/auth/stream/?token=<access_token>
+    Streams current member profile updates as Server-Sent Events.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request: Request) -> Response:
+        token = request.query_params.get("token")
+        if not token:
+            return Response({"error": "token is required"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        try:
+            access = AccessToken(token)
+            user_id = access.get("user_id")
+            user = User.objects.get(id=user_id)
+        except Exception:
+            return Response({"error": "invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        def event_stream():
+            last_payload = ""
+            try:
+                while True:
+                    try:
+                        member = Member.objects.get(user=user)
+                        payload = MemberSerializer(member).data
+                    except Member.DoesNotExist:
+                        payload = {
+                            "is_analyzing": True,
+                            "analysis_status": "PENDING",
+                            "analysis_progress": 0,
+                            "analysis_message": "Waiting for member profile...",
+                        }
+
+                    data = json.dumps(payload)
+                    if data != last_payload:
+                        yield f"event: member_update\ndata: {data}\n\n"
+                        last_payload = data
+
+                    time.sleep(2)
+            except GeneratorExit:
+                return
+
+        response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"
+        return response
 
     def put(self, request: Request) -> Response:
         try:

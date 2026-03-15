@@ -28,15 +28,61 @@ class SyncOrganizationView(APIView):
     def post(self, request: Request) -> Response:
         org_name = request.data.get("org_name") or "communa-ai"
         access_token = None
+        current_member = None
         if request.user.is_authenticated:
             try:
-                member = Member.objects.get(user=request.user)
-                access_token = member.github_token or None
+                current_member = Member.objects.get(user=request.user)
+                access_token = current_member.github_token or None
+                current_member.is_analyzing = True
+                current_member.analysis_status = Member.AnalysisStatus.RUNNING
+                current_member.analysis_progress = 1
+                current_member.analysis_message = f"Starting organization sync for {org_name}..."
+                current_member.save(
+                    update_fields=[
+                        "is_analyzing",
+                        "analysis_status",
+                        "analysis_progress",
+                        "analysis_message",
+                        "updated_at",
+                    ]
+                )
             except Member.DoesNotExist:
                 pass
 
-        synced_members = GithubSyncService.sync_organization(org_name=org_name, access_token=access_token)
-        proposals = ProjectGeneratorService.generate_proposals()
+        def _sync_progress(processed: int, total: int, current_username: str) -> None:
+            if not current_member:
+                return
+            try:
+                cm = Member.objects.get(id=current_member.id)
+                cm.analysis_progress = min(90, int((processed / total) * 90)) if total > 0 else 10
+                cm.analysis_message = f"Syncing members ({processed}/{total})... {current_username}"
+                cm.save(update_fields=["analysis_progress", "analysis_message", "updated_at"])
+            except Exception:
+                pass
+
+        synced_members = GithubSyncService.sync_organization(
+            org_name=org_name,
+            access_token=access_token,
+            progress_callback=_sync_progress if current_member else None,
+        )
+        try:
+            proposals = ProjectGeneratorService.generate_proposals()
+        except ValueError as exc:
+            if current_member:
+                cm = Member.objects.get(id=current_member.id)
+                cm.is_analyzing = False
+                cm.analysis_status = Member.AnalysisStatus.FAILED
+                cm.analysis_message = str(exc)
+                cm.save(update_fields=["is_analyzing", "analysis_status", "analysis_message", "updated_at"])
+            return Response(
+                {
+                    "message": str(exc),
+                    "members_synced": len(synced_members),
+                    "proposals_generated": 0,
+                    "logs": GithubSyncService.get_sync_logs(),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         logs = GithubSyncService.get_sync_logs()
         status_code = status.HTTP_200_OK
@@ -48,6 +94,26 @@ class SyncOrganizationView(APIView):
             for log in logs
         ):
             status_code = status.HTTP_400_BAD_REQUEST
+
+        if current_member:
+            cm = Member.objects.get(id=current_member.id)
+            cm.is_analyzing = False
+            cm.analysis_status = Member.AnalysisStatus.READY if status_code == status.HTTP_200_OK else Member.AnalysisStatus.FAILED
+            cm.analysis_progress = 100 if status_code == status.HTTP_200_OK else cm.analysis_progress
+            cm.analysis_message = (
+                f"Organization sync complete. {len(synced_members)} members synced."
+                if status_code == status.HTTP_200_OK
+                else (logs[-1] if logs else "Organization sync failed.")
+            )
+            cm.save(
+                update_fields=[
+                    "is_analyzing",
+                    "analysis_status",
+                    "analysis_progress",
+                    "analysis_message",
+                    "updated_at",
+                ]
+            )
 
         return Response(
             {
@@ -84,7 +150,10 @@ class ProposalRefreshView(APIView):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def post(self, request: Request) -> Response:
-        proposals = ProjectGeneratorService.generate_proposals(refresh=True)
+        try:
+            proposals = ProjectGeneratorService.generate_proposals(refresh=True)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         serializer = ProjectProposalSerializer(proposals, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -128,7 +197,16 @@ class ProjectCreateView(APIView):
         )
 
         # Match team using AI
-        suggestions = AITeamMatcherService.match_team(project)
+        try:
+            suggestions = AITeamMatcherService.match_team(project)
+        except ValueError as exc:
+            project.delete()
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not suggestions:
+            project.delete()
+            return Response({"error": "AI did not return team members for this project."}, status=status.HTTP_400_BAD_REQUEST)
+
         AITeamMatcherService.apply_team(project, suggestions)
 
         # Refresh project to get assignments

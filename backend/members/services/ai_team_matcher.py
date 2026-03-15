@@ -5,9 +5,10 @@ import os
 from typing import Any
 
 from members.models import Member, Project, ProjectMember
+from members.services.ai_client import deepseek_chat
 
 
-GEMINI_PROMPT_TEMPLATE = """
+AI_TEAM_PROMPT_TEMPLATE = """
 You are an expert engineering team builder. Given a project and a pool of available developers,
 suggest the best 3-5 team members and explain why each person is a good fit.
 
@@ -34,20 +35,25 @@ Select 3 to 5 members. Only include members whose skills are relevant to the pro
 
 class AITeamMatcherService:
     @staticmethod
+    def _log_ai_raw(tag: str, text: str) -> None:
+        preview = (text or "")[:12000]
+        print(f"[DEEPSEEK_RAW::{tag}] {preview}")
+
+    @staticmethod
     def match_team(project: Project) -> list[dict[str, Any]]:
         """
-        Call Gemini API to suggest team members for a project.
+        Call DeepSeek API to suggest team members for a project.
         Returns list of { member_id, role, reasoning }.
-        Falls back to top-3 by impact_score if AI fails or key is missing.
+        AI-only mode: requires DeepSeek key and valid AI response.
         """
-        api_key = os.getenv("GEMINI_API_KEY", "")
+        api_key = os.getenv("DEEPSEEK_API_KEY", "")
         members = list(Member.objects.all())
 
         if not members:
             return []
 
         if not api_key:
-            return AITeamMatcherService._fallback_match(project, members)
+            raise ValueError("DEEPSEEK_API_KEY is required for AI-only team matching.")
 
         members_list = "\n".join(
             f"- ID {m.id}: {m.name} | Skills: {', '.join(m.top_skills)} | "
@@ -55,7 +61,7 @@ class AITeamMatcherService:
             for m in members
         )
 
-        prompt = GEMINI_PROMPT_TEMPLATE.format(
+        prompt = AI_TEAM_PROMPT_TEMPLATE.format(
             title=project.title,
             description=project.description,
             required_skills=", ".join(project.required_skills),
@@ -63,43 +69,29 @@ class AITeamMatcherService:
         )
 
         try:
-            from google import genai  # type: ignore
-            client = genai.Client(api_key=api_key)
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt,
-            )
-            text = response.text.strip()
+            text = deepseek_chat(prompt, temperature=0.2)
+            AITeamMatcherService._log_ai_raw("TEAM_MATCH", text)
             # Strip possible markdown code fences
             if text.startswith("```"):
                 text = text.split("```")[1]
                 if text.startswith("json"):
                     text = text[4:]
                 text = text.strip()
-            suggestions = json.loads(text)
+
+            try:
+                suggestions = json.loads(text)
+            except Exception:
+                first = text.find("[")
+                last = text.rfind("]")
+                if first == -1 or last == -1 or last <= first:
+                    return []
+                suggestions = json.loads(text[first:last + 1])
+
+            if not isinstance(suggestions, list):
+                return []
             return suggestions
         except Exception as exc:
-            print(f"[AITeamMatcherService] Gemini call failed: {exc}. Using fallback.")
-            return AITeamMatcherService._fallback_match(project, members)
-
-    @staticmethod
-    def _fallback_match(project: Project, members: list[Member]) -> list[dict]:
-        """Simple skill-based fallback: sort by matching skills + impact score."""
-        required = set(s.lower() for s in project.required_skills)
-
-        def score(m: Member) -> float:
-            skill_match = len(required & set(s.lower() for s in m.top_skills))
-            return skill_match * 20 + m.impact_score
-
-        ranked = sorted(members, key=score, reverse=True)[:3]
-        return [
-            {
-                "member_id": m.id,
-                "role": "Core Contributor",
-                "reasoning": f"{m.name} has {m.impact_score} impact score with relevant skills.",
-            }
-            for m in ranked
-        ]
+            raise ValueError(f"DeepSeek team matching failed: {exc}")
 
     @staticmethod
     def apply_team(project: Project, suggestions: list[dict[str, Any]]) -> None:

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { mockProjects, mockMembers, Member } from '../mockData';
 import { Target, Users, Zap, CheckCircle2, ChevronRight, BookOpen, Clock, Activity, Plus, XCircle, RefreshCcw } from 'lucide-react';
 import { projectsApi } from '../api/projects';
+import { useAuth } from '../context/AuthContext';
 
 interface ProjectGeneratorProps {
   onActivate: (projectName: string) => void;
@@ -12,6 +12,7 @@ interface ProjectGeneratorProps {
 }
 
 export function ProjectGenerator({ onActivate, onViewDetails, onCreateNew, isLoading, onShowToast }: ProjectGeneratorProps) {
+  const { user } = useAuth();
   const [proposals, setProposals] = useState<any[]>([]);
   const [loadingProposals, setLoadingProposals] = useState(true);
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
@@ -20,19 +21,37 @@ export function ProjectGenerator({ onActivate, onViewDetails, onCreateNew, isLoa
   const [activating, setActivating] = useState<string | null>(null);
   const [refreshingIdeas, setRefreshingIdeas] = useState(false);
 
+  const loadProposals = async () => {
+    try {
+      const data = await projectsApi.listProposals();
+      setProposals(data);
+    } catch (err) {
+      console.error('Failed to load proposals', err);
+    } finally {
+      setLoadingProposals(false);
+    }
+  };
+
   useEffect(() => {
-    const loadProposals = async () => {
-      try {
-        const data = await projectsApi.listProposals();
-        setProposals(data);
-      } catch (err) {
-        console.error('Failed to load proposals', err);
-      } finally {
-        setLoadingProposals(false);
-      }
-    };
     loadProposals();
   }, []);
+
+  useEffect(() => {
+    const handleMemberUpdate = () => {
+      loadProposals();
+    };
+
+    window.addEventListener('member_update', handleMemberUpdate);
+    return () => window.removeEventListener('member_update', handleMemberUpdate);
+  }, []);
+
+  useEffect(() => {
+    if (!user?.is_analyzing) return;
+    const id = window.setInterval(() => {
+      loadProposals();
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [user?.is_analyzing]);
 
   const handleRemoveMember = (projectId: string, memberId: string) => {
     setProposals(proposals.map(p => {
@@ -86,7 +105,7 @@ export function ProjectGenerator({ onActivate, onViewDetails, onCreateNew, isLoa
       onShowToast('AI generated fresh project ideas.');
     } catch (err) {
       console.error(err);
-      onShowToast('Failed to refresh AI ideas.');
+      onShowToast((err as Error)?.message || 'Failed to refresh AI ideas.');
     } finally {
       setRefreshingIdeas(false);
     }

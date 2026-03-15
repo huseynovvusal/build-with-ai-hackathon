@@ -1,24 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { Github, Activity } from 'lucide-react';
 import { membersApi } from '../api/members';
+import { useAuth } from '../context/AuthContext';
 
 export function MemberGrid() {
+  const { user } = useAuth();
   const [members, setMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const fetchMembers = async () => {
+    try {
+      const data = await membersApi.list();
+      setMembers(data);
+    } catch (err) {
+      console.error('Failed to fetch members:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchMembers = async () => {
-      try {
-        const data = await membersApi.list();
-        setMembers(data);
-      } catch (err) {
-        console.error('Failed to fetch members:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchMembers();
   }, []);
+
+  useEffect(() => {
+    const handleMemberUpdate = () => {
+      fetchMembers();
+    };
+
+    window.addEventListener('member_update', handleMemberUpdate);
+    return () => window.removeEventListener('member_update', handleMemberUpdate);
+  }, []);
+
+  useEffect(() => {
+    if (!user?.is_analyzing) return;
+    const id = window.setInterval(() => {
+      fetchMembers();
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [user?.is_analyzing]);
   if (isLoading) {
     return (
       <div className="p-8">

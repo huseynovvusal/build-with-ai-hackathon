@@ -22,6 +22,10 @@ class MemberSerializer(serializers.ModelSerializer):
             "prs_merged_count",
             "issues_count",
             "reviews_count",
+            "is_analyzing",
+            "analysis_status",
+            "analysis_progress",
+            "analysis_message",
         ]
 
 

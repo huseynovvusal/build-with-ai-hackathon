@@ -18,8 +18,10 @@ CSRF_TRUSTED_ORIGINS = [
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
 
-# Gemini AI
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+# DeepSeek AI
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 
 INSTALLED_APPS = [
     "django.contrib.admin",

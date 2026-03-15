@@ -5,4 +5,3 @@ django-cors-headers>=4.3,<5.0
 gunicorn>=22.0,<24.0
 psycopg[binary]>=3.2,<4.0
 requests>=2.31,<3.0
-google-genai>=1.0,<2.0

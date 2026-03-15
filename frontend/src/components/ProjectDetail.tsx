@@ -33,49 +33,22 @@ export function ProjectDetail({ projectId, onBack, onActivate, isLoading }: Proj
 
   const initiatives = useMemo(() => {
     if (!project) return [];
-    if (Array.isArray(project.initiatives) && project.initiatives.length > 0) {
-      return project.initiatives;
-    }
-    return [
-      `Kick off initiative: ${project.title}`,
-      'Define technical milestones and ownership.',
-      'Track delivery with weekly progress updates.',
-    ];
+    return Array.isArray(project.initiatives) ? project.initiatives : [];
   }, [project]);
 
   const technicalTips = useMemo(() => {
     if (!project) return [];
-    if (Array.isArray(project.technical_tips) && project.technical_tips.length > 0) {
-      return project.technical_tips;
-    }
-    return [
-      'Start with a small vertical slice before scaling scope.',
-      'Add observability and logs from day one.',
-      'Keep interfaces modular to simplify team parallelization.',
-    ];
+    return Array.isArray(project.technical_tips) ? project.technical_tips : [];
   }, [project]);
 
   const overallTips = useMemo(() => {
     if (!project) return [];
-    if (Array.isArray(project.overall_strategy) && project.overall_strategy.length > 0) {
-      return project.overall_strategy;
-    }
-    return [
-      'Align work with org priorities and contributor strengths.',
-      'Keep communication async-friendly and transparent.',
-      'Review team capacity every sprint.',
-    ];
+    return Array.isArray(project.overall_strategy) ? project.overall_strategy : [];
   }, [project]);
 
   const requiredSkills = useMemo(() => {
-    if (!project?.team_assignments) return [];
-    if (Array.isArray(project.required_dna) && project.required_dna.length > 0) {
-      return project.required_dna;
-    }
-    const fromMembers = project.team_assignments
-      .flatMap((assignment: any) => assignment.member?.top_skills || [])
-      .filter(Boolean);
-    return [...new Set(fromMembers)].slice(0, 8);
+    if (!project) return [];
+    return Array.isArray(project.required_dna) ? project.required_dna : [];
   }, [project]);
 
   if (isLoading || loadingDetail) {
@@ -147,12 +120,14 @@ export function ProjectDetail({ projectId, onBack, onActivate, isLoading }: Proj
               AI-Generated Initiatives
             </h3>
             <ul className="space-y-3">
-              {initiatives.map((initiative, idx) => (
+              {initiatives.length > 0 ? initiatives.map((initiative, idx) => (
                 <li key={idx} className="flex items-start gap-3">
                   <span className="font-mono text-emerald-600 font-bold mt-0.5">[{idx + 1}]</span>
                   <span className="text-slate-800">{initiative}</span>
                 </li>
-              ))}
+              )) : (
+                <li className="text-slate-400 font-mono text-sm">No AI initiatives generated yet.</li>
+              )}
             </ul>
           </div>
 
@@ -164,12 +139,14 @@ export function ProjectDetail({ projectId, onBack, onActivate, isLoading }: Proj
                 Technical Tips
               </h3>
               <ul className="space-y-4">
-                {technicalTips.map((tip, idx) => (
+                {technicalTips.length > 0 ? technicalTips.map((tip, idx) => (
                   <li key={idx} className="flex items-start gap-3">
                     <span className="font-mono text-blue-400 mt-1">{`>`}</span>
                     <span className="font-mono text-sm text-slate-300 leading-relaxed">{tip}</span>
                   </li>
-                ))}
+                )) : (
+                  <li className="text-slate-400 font-mono text-sm">No AI technical tips generated yet.</li>
+                )}
               </ul>
             </div>
 
@@ -180,12 +157,14 @@ export function ProjectDetail({ projectId, onBack, onActivate, isLoading }: Proj
                 Overall Strategy
               </h3>
               <ul className="space-y-4">
-                {overallTips.map((tip, idx) => (
+                {overallTips.length > 0 ? overallTips.map((tip, idx) => (
                   <li key={idx} className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-amber-600 mt-2 shrink-0" />
                     <span className="text-slate-800 text-sm leading-relaxed">{tip}</span>
                   </li>
-                ))}
+                )) : (
+                  <li className="text-slate-400 font-mono text-sm">No AI strategy generated yet.</li>
+                )}
               </ul>
             </div>
           </div>

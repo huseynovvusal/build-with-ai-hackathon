@@ -60,6 +60,15 @@ export default function App() {
       />
       
       <main className="flex-1 h-screen overflow-y-auto">
+        {user?.is_analyzing && (
+          <div className="mx-8 mt-6 mb-2 border-2 border-amber-500 bg-amber-50 px-4 py-3">
+            <p className="font-mono text-xs uppercase font-bold text-amber-700">
+              Analyzing GitHub data... {Number(user.analysis_progress || 0)}%
+            </p>
+            <p className="text-sm text-amber-900 mt-1">{user.analysis_message || 'Preparing insights and syncing organization.'}</p>
+          </div>
+        )}
+
         {activeTab === 'members' ? (
           <MemberGrid />
         ) : activeTab === 'meritocracy' ? (

@@ -3,6 +3,12 @@ from django.db import models
 
 
 class Member(models.Model):
+    class AnalysisStatus(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        RUNNING = "RUNNING", "Running"
+        READY = "READY", "Ready"
+        FAILED = "FAILED", "Failed"
+
     user = models.OneToOneField(
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name="member"
     )
@@ -21,6 +27,14 @@ class Member(models.Model):
     issues_count = models.PositiveIntegerField(default=0)
     reviews_count = models.PositiveIntegerField(default=0)
     github_token = models.TextField(blank=True)
+    is_analyzing = models.BooleanField(default=False)
+    analysis_status = models.CharField(
+        max_length=20,
+        choices=AnalysisStatus.choices,
+        default=AnalysisStatus.PENDING,
+    )
+    analysis_progress = models.PositiveIntegerField(default=0)
+    analysis_message = models.CharField(max_length=255, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

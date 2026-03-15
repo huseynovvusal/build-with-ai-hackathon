@@ -18,7 +18,10 @@ export const projectsApi = {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Failed to create project');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || 'Failed to create project');
+    }
     return res.json();
   },
 
@@ -32,7 +35,10 @@ export const projectsApi = {
     const res = await apiFetch('/proposals/refresh/', {
       method: 'POST',
     });
-    if (!res.ok) throw new Error('Failed to refresh proposals');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || 'Failed to refresh proposals');
+    }
     return res.json();
   },
 

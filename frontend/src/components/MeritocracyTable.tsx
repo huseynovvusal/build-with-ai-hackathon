@@ -1,32 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, TrendingUp, GitCommit, Search, Activity } from 'lucide-react';
 import { membersApi } from '../api/members';
+import { useAuth } from '../context/AuthContext';
 
 type Timeframe = 'weekly' | 'monthly' | 'lifetime';
 
 export function MeritocracyTable() {
+  const { user } = useAuth();
   const [members, setMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<Timeframe>('weekly'); // Keep timeframe state if needed for other parts
 
+  const fetchMembers = async () => {
+    try {
+      const data = await membersApi.list();
+      // Sort by impact score descending
+      const sorted = data.sort((a: any, b: any) => Number(b.impact_score) - Number(a.impact_score));
+      setMembers(sorted);
+    } catch (err) {
+      console.error('Failed to fetch members:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchMembers = async () => {
-      try {
-        const data = await membersApi.list();
-        // Sort by impact score descending
-        const sorted = data.sort((a: any, b: any) => Number(b.impact_score) - Number(a.impact_score));
-        setMembers(sorted);
-      } catch (err) {
-        console.error('Failed to fetch members:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchMembers();
   }, []);
 
-  // The sortedMembers based on mockData and timeframe is no longer relevant if using live data
-  // const sortedMembers = [...mockMembers].sort((a, b) => b.stats[timeframe].score - a.stats[timeframe].score);
+  useEffect(() => {
+    const handleMemberUpdate = () => {
+      fetchMembers();
+    };
+
+    window.addEventListener('member_update', handleMemberUpdate);
+    return () => window.removeEventListener('member_update', handleMemberUpdate);
+  }, []);
+
+  useEffect(() => {
+    if (!user?.is_analyzing) return;
+    const id = window.setInterval(() => {
+      fetchMembers();
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [user?.is_analyzing]);
 
   if (isLoading) {
     return (

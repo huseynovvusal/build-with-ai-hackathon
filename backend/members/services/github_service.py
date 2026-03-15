@@ -16,7 +16,12 @@ class GithubSyncService:
         return cls._sync_logs
 
     @classmethod
-    def sync_organization(cls, org_name: str, access_token: str | None = None) -> list[Member]:
+    def sync_organization(
+        cls,
+        org_name: str,
+        access_token: str | None = None,
+        progress_callback: Any | None = None,
+    ) -> list[Member]:
         cls._sync_logs = [
             f"Starting sync for organization: {org_name}",
             "Fetching members from GitHub API...",
@@ -62,12 +67,16 @@ class GithubSyncService:
             return []
 
         cls._sync_logs.append(f"Found {len(org_members)} members. Fetching full profiles and scraping repos...")
+        if callable(progress_callback):
+            progress_callback(0, len(org_members), "starting")
 
         synced_members: list[Member] = []
         with transaction.atomic():
-            for m in org_members:
+            for idx, m in enumerate(org_members, start=1):
                 username = m.get("login")
                 if not username:
+                    if callable(progress_callback):
+                        progress_callback(idx, len(org_members), "skipped")
                     continue
                 
                 # Fetch full profile to get name, bio, company
@@ -81,6 +90,8 @@ class GithubSyncService:
                     profile = profile_resp.json()
                 except Exception as e:
                     cls._sync_logs.append(f"Failed to fetch profile for {username}: {e}")
+                    if callable(progress_callback):
+                        progress_callback(idx, len(org_members), username)
                     continue
 
                 github_id = profile.get("id")
@@ -115,6 +126,8 @@ class GithubSyncService:
                 )
                 synced_members.append(member)
                 cls._sync_logs.append(f"Synced member: {name} ({username})")
+                if callable(progress_callback):
+                    progress_callback(idx, len(org_members), username)
 
         cls._sync_logs.extend(
             [

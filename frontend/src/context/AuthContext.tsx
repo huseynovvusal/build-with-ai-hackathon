@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authApi } from '../api/auth';
+import { API_BASE_URL } from '../api/client';
 
 interface AuthContextType {
   user: any | null;
@@ -39,6 +40,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener('unauthorized', handleUnauthorized);
     return () => window.removeEventListener('unauthorized', handleUnauthorized);
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const streamUrl = `${API_BASE_URL}/auth/stream/?token=${encodeURIComponent(token)}`;
+    const eventSource = new EventSource(streamUrl);
+
+    const onMemberUpdate = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        setUser(data);
+        window.dispatchEvent(new CustomEvent('member_update', { detail: data }));
+      } catch (err) {
+        console.error('Failed to parse stream payload', err);
+      }
+    };
+
+    eventSource.addEventListener('member_update', onMemberUpdate as EventListener);
+
+    eventSource.onerror = () => {
+      // Keep silent; browser auto-reconnects EventSource
+    };
+
+    return () => {
+      eventSource.removeEventListener('member_update', onMemberUpdate as EventListener);
+      eventSource.close();
+    };
+  }, [token]);
 
   const login = (access: string, refresh: string, member: any) => {
     localStorage.setItem('token_access', access);
