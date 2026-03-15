@@ -41,6 +41,11 @@ services:
       GUNICORN_WORKERS: ${GUNICORN_WORKERS}
       GUNICORN_THREADS: ${GUNICORN_THREADS}
       GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL}
     depends_on:
       db:
         condition: service_healthy
@@ -60,6 +65,22 @@ services:
       start_period: 40s
     networks:
       - communa_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: communa-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - VITE_GITHUB_REDIRECT_URI=${GITHUB_REDIRECT_URI}
+    networks:
+      - communa_network
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:

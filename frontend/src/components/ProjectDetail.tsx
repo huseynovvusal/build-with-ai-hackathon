@@ -1,6 +1,6 @@
-import React from 'react';
-import { mockProjects, mockMembers } from '../mockData';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, BrainCircuit, Target, Code, Lightbulb, Users, CheckCircle2 } from 'lucide-react';
+import { projectsApi } from '../api/projects';
 
 interface ProjectDetailProps {
   projectId: string;
@@ -10,7 +10,48 @@ interface ProjectDetailProps {
 }
 
 export function ProjectDetail({ projectId, onBack, onActivate, isLoading }: ProjectDetailProps) {
-  if (isLoading) {
+  const [project, setProject] = useState<any | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(true);
+
+  useEffect(() => {
+    const loadProject = async () => {
+      setLoadingDetail(true);
+      try {
+        const proposals = await projectsApi.listProposals();
+        const match = proposals.find((p: any) => String(p.id) === String(projectId));
+        setProject(match || null);
+      } catch (err) {
+        console.error('Failed to fetch project detail:', err);
+        setProject(null);
+      } finally {
+        setLoadingDetail(false);
+      }
+    };
+
+    loadProject();
+  }, [projectId]);
+
+  const initiatives = useMemo(() => {
+    if (!project) return [];
+    return Array.isArray(project.initiatives) ? project.initiatives : [];
+  }, [project]);
+
+  const technicalTips = useMemo(() => {
+    if (!project) return [];
+    return Array.isArray(project.technical_tips) ? project.technical_tips : [];
+  }, [project]);
+
+  const overallTips = useMemo(() => {
+    if (!project) return [];
+    return Array.isArray(project.overall_strategy) ? project.overall_strategy : [];
+  }, [project]);
+
+  const requiredSkills = useMemo(() => {
+    if (!project) return [];
+    return Array.isArray(project.required_dna) ? project.required_dna : [];
+  }, [project]);
+
+  if (isLoading || loadingDetail) {
     return (
       <div className="p-8 max-w-6xl mx-auto animate-pulse">
         <div className="h-6 w-32 bg-slate-200 mb-8 border-2 border-slate-300"></div>
@@ -28,8 +69,6 @@ export function ProjectDetail({ projectId, onBack, onActivate, isLoading }: Proj
       </div>
     );
   }
-
-  const project = mockProjects.find(p => p.id === projectId);
 
   if (!project) {
     return (
@@ -70,7 +109,7 @@ export function ProjectDetail({ projectId, onBack, onActivate, isLoading }: Proj
               AI Strategic Reasoning
             </div>
             <p className="font-mono text-sm text-blue-900 leading-relaxed pt-2">
-              {project.reasoning}
+              {project.ai_reasoning}
             </p>
           </div>
 
@@ -81,12 +120,14 @@ export function ProjectDetail({ projectId, onBack, onActivate, isLoading }: Proj
               AI-Generated Initiatives
             </h3>
             <ul className="space-y-3">
-              {project.initiatives.map((initiative, idx) => (
+              {initiatives.length > 0 ? initiatives.map((initiative, idx) => (
                 <li key={idx} className="flex items-start gap-3">
                   <span className="font-mono text-emerald-600 font-bold mt-0.5">[{idx + 1}]</span>
                   <span className="text-slate-800">{initiative}</span>
                 </li>
-              ))}
+              )) : (
+                <li className="text-slate-400 font-mono text-sm">No AI initiatives generated yet.</li>
+              )}
             </ul>
           </div>
 
@@ -98,12 +139,14 @@ export function ProjectDetail({ projectId, onBack, onActivate, isLoading }: Proj
                 Technical Tips
               </h3>
               <ul className="space-y-4">
-                {project.technicalTips.map((tip, idx) => (
+                {technicalTips.length > 0 ? technicalTips.map((tip, idx) => (
                   <li key={idx} className="flex items-start gap-3">
                     <span className="font-mono text-blue-400 mt-1">{`>`}</span>
                     <span className="font-mono text-sm text-slate-300 leading-relaxed">{tip}</span>
                   </li>
-                ))}
+                )) : (
+                  <li className="text-slate-400 font-mono text-sm">No AI technical tips generated yet.</li>
+                )}
               </ul>
             </div>
 
@@ -114,12 +157,14 @@ export function ProjectDetail({ projectId, onBack, onActivate, isLoading }: Proj
                 Overall Strategy
               </h3>
               <ul className="space-y-4">
-                {project.overallTips.map((tip, idx) => (
+                {overallTips.length > 0 ? overallTips.map((tip, idx) => (
                   <li key={idx} className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-amber-600 mt-2 shrink-0" />
                     <span className="text-slate-800 text-sm leading-relaxed">{tip}</span>
                   </li>
-                ))}
+                )) : (
+                  <li className="text-slate-400 font-mono text-sm">No AI strategy generated yet.</li>
+                )}
               </ul>
             </div>
           </div>
@@ -134,15 +179,15 @@ export function ProjectDetail({ projectId, onBack, onActivate, isLoading }: Proj
             </h4>
             
             <div className="space-y-3 mb-8">
-              {project.suggestedMembers.map(memberId => {
-                const member = mockMembers.find(m => m.id === memberId);
+              {(project.team_assignments || []).map((assignment: any) => {
+                const member = assignment.member;
                 if (!member) return null;
                 return (
                   <div key={member.id} className="flex items-center gap-3 bg-white border-2 border-slate-900 p-3">
-                    <img src={member.avatar} alt={member.name} className="w-10 h-10 border-2 border-slate-900" />
+                    <img src={member.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.github_id}`} alt={member.name} className="w-10 h-10 border-2 border-slate-900" />
                     <div>
                       <div className="font-bold text-sm">{member.name}</div>
-                      <div className="font-mono text-[10px] text-slate-500">{member.handle}</div>
+                      <div className="font-mono text-[10px] text-slate-500">{assignment.role || member.github_id}</div>
                     </div>
                   </div>
                 );
@@ -152,11 +197,13 @@ export function ProjectDetail({ projectId, onBack, onActivate, isLoading }: Proj
             <div className="mb-8">
               <h4 className="font-bold uppercase text-xs text-slate-500 tracking-wider mb-3">Required DNA</h4>
               <div className="flex flex-wrap gap-2">
-                {project.requiredSkills.map(skill => (
+                {requiredSkills.length > 0 ? requiredSkills.map((skill: string) => (
                   <span key={skill} className="px-2 py-1 border border-slate-900 bg-white font-mono text-xs text-slate-800">
                     {skill}
                   </span>
-                ))}
+                )) : (
+                  <span className="font-mono text-xs text-slate-400">No inferred skills yet</span>
+                )}
               </div>
             </div>
 

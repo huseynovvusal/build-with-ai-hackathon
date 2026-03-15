@@ -1,22 +1,60 @@
-import React, { useState } from 'react';
-import { mockProjects, mockMembers, Member } from '../mockData';
-import { BrainCircuit, Plus, X, Search, Zap, CheckCircle2, FileText, XCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Target, Users, Zap, CheckCircle2, ChevronRight, BookOpen, Clock, Activity, Plus, XCircle, RefreshCcw } from 'lucide-react';
+import { projectsApi } from '../api/projects';
+import { useAuth } from '../context/AuthContext';
 
 interface ProjectGeneratorProps {
   onActivate: (projectName: string) => void;
   onViewDetails: (projectId: string) => void;
-  onShowToast: (msg: string) => void;
+  onCreateNew: () => void;
   isLoading?: boolean;
+  onShowToast: (msg: string) => void;
 }
 
-export function ProjectGenerator({ onActivate, onViewDetails, onShowToast, isLoading }: ProjectGeneratorProps) {
-  const [projects, setProjects] = useState(mockProjects);
+export function ProjectGenerator({ onActivate, onViewDetails, onCreateNew, isLoading, onShowToast }: ProjectGeneratorProps) {
+  const { user } = useAuth();
+  const [proposals, setProposals] = useState<any[]>([]);
+  const [loadingProposals, setLoadingProposals] = useState(true);
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [activating, setActivating] = useState<string | null>(null);
+  const [refreshingIdeas, setRefreshingIdeas] = useState(false);
+
+  const loadProposals = async () => {
+    try {
+      const data = await projectsApi.listProposals();
+      setProposals(data);
+    } catch (err) {
+      console.error('Failed to load proposals', err);
+    } finally {
+      setLoadingProposals(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProposals();
+  }, []);
+
+  useEffect(() => {
+    const handleMemberUpdate = () => {
+      loadProposals();
+    };
+
+    window.addEventListener('member_update', handleMemberUpdate);
+    return () => window.removeEventListener('member_update', handleMemberUpdate);
+  }, []);
+
+  useEffect(() => {
+    if (!user?.is_analyzing) return;
+    const id = window.setInterval(() => {
+      loadProposals();
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [user?.is_analyzing]);
 
   const handleRemoveMember = (projectId: string, memberId: string) => {
-    setProjects(projects.map(p => {
+    setProposals(proposals.map(p => {
       if (p.id === projectId) {
         return { ...p, suggestedMembers: p.suggestedMembers.filter(id => id !== memberId) };
       }
@@ -25,7 +63,7 @@ export function ProjectGenerator({ onActivate, onViewDetails, onShowToast, isLoa
   };
 
   const handleAddMember = (projectId: string, memberId: string) => {
-    setProjects(projects.map(p => {
+    setProposals(proposals.map(p => {
       if (p.id === projectId && !p.suggestedMembers.includes(memberId)) {
         return { ...p, suggestedMembers: [...p.suggestedMembers, memberId] };
       }
@@ -35,7 +73,7 @@ export function ProjectGenerator({ onActivate, onViewDetails, onShowToast, isLoa
   };
 
   const handleRejectSubmit = (projectId: string, withReason: boolean) => {
-    setProjects(projects.filter(p => p.id !== projectId));
+    setProposals(proposals.filter(p => p.id !== projectId));
     setRejectingId(null);
     setRejectReason('');
     if (withReason) {
@@ -45,166 +83,140 @@ export function ProjectGenerator({ onActivate, onViewDetails, onShowToast, isLoa
     }
   };
 
-  if (isLoading) {
+  const handleActivate = async (id: number, title: string) => {
+    setActivating(title);
+    try {
+      await projectsApi.activateProposal(id);
+      onShowToast(`Activated ${title}! Team assignments created.`);
+      onActivate(title);
+    } catch (err) {
+      console.error(err);
+      onShowToast(`Failed to activate ${title}`);
+    } finally {
+      setActivating(null);
+    }
+  };
+
+  const handleRefreshIdeas = async () => {
+    setRefreshingIdeas(true);
+    try {
+      const data = await projectsApi.refreshProposals();
+      setProposals(data);
+      onShowToast('AI generated fresh project ideas.');
+    } catch (err) {
+      console.error(err);
+      onShowToast((err as Error)?.message || 'Failed to refresh AI ideas.');
+    } finally {
+      setRefreshingIdeas(false);
+    }
+  };
+
+  if (loadingProposals || isLoading) {
     return (
-      <div className="p-8">
-        <div className="mb-8 flex justify-between items-end border-b-2 border-slate-900 pb-4">
-          <div className="h-10 w-64 bg-slate-200 animate-pulse border-2 border-slate-300"></div>
-          <div className="h-10 w-40 bg-slate-200 animate-pulse border-2 border-slate-300"></div>
-        </div>
-        <div className="space-y-8">
-          {[...Array(2)].map((_, i) => (
-            <div key={i} className="border-2 border-slate-300 bg-slate-50 flex flex-col xl:flex-row animate-pulse h-96">
-              <div className="p-6 xl:w-2/3 border-b-2 xl:border-b-0 xl:border-r-2 border-slate-300 flex flex-col space-y-4">
-                <div className="h-8 bg-slate-200 w-1/2"></div>
-                <div className="h-4 bg-slate-200 w-full"></div>
-                <div className="h-4 bg-slate-200 w-5/6"></div>
-                <div className="h-32 bg-slate-200 w-full mt-auto"></div>
-              </div>
-              <div className="p-6 xl:w-1/3 space-y-4">
-                <div className="h-6 bg-slate-200 w-1/2 mb-8"></div>
-                <div className="h-12 bg-slate-200 w-full"></div>
-                <div className="h-12 bg-slate-200 w-full"></div>
-                <div className="h-12 bg-slate-200 w-full"></div>
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className="p-8 h-full flex items-center justify-center">
+        <Zap className="w-12 h-12 text-blue-600 animate-spin" />
       </div>
     );
   }
 
   return (
     <div className="p-8">
-      <div className="mb-8 flex justify-between items-end border-b-2 border-slate-900 pb-4">
+      <div className="flex justify-between items-end mb-8 border-b-2 border-slate-900 pb-4">
         <div>
           <h2 className="text-3xl font-bold uppercase tracking-tight flex items-center gap-3">
-            <Zap className="w-8 h-8 text-blue-600" />
-            Project Generator
+            <Target className="w-8 h-8 text-blue-600" />
+            AI Initiated Projects
           </h2>
-          <p className="text-slate-500 font-mono text-sm mt-2">AI-synthesized initiatives based on organizational technical DNA</p>
+          <p className="text-slate-500 font-mono text-sm mt-2">Platform-generated high-impact proposals based on community skill gaps.</p>
         </div>
-        <button className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 font-bold uppercase text-sm border-2 border-slate-900 hover:bg-slate-800 transition-colors">
-          <BrainCircuit className="w-4 h-4" />
-          Regenerate Ideas
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRefreshIdeas}
+            disabled={refreshingIdeas}
+            className="flex items-center gap-2 border-2 border-blue-700 bg-blue-600 text-white font-bold uppercase text-sm tracking-wider px-4 py-2 hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            <RefreshCcw className={`w-4 h-4 ${refreshingIdeas ? 'animate-spin' : ''}`} />
+            {refreshingIdeas ? 'Refreshing...' : 'Refresh Ideas'}
+          </button>
+          <button
+            onClick={onCreateNew}
+            className="flex items-center gap-2 border-2 border-slate-900 bg-slate-900 text-white font-bold uppercase text-sm tracking-wider px-4 py-2 hover:bg-slate-800 transition-colors shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1"
+          >
+            <Plus className="w-5 h-5" />
+            Create My Own
+          </button>
+        </div>
       </div>
 
-      <div className="space-y-8">
-        {projects.map(project => (
-          <div key={project.id} className="border-2 border-slate-900 bg-white flex flex-col xl:flex-row">
-            {/* Project Details */}
-            <div className="p-6 xl:w-2/3 border-b-2 xl:border-b-0 xl:border-r-2 border-slate-900 flex flex-col">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-4">
-                  <h3 className="text-2xl font-bold">{project.title}</h3>
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 border border-blue-300 font-mono text-xs font-bold uppercase">
-                    High Match
-                  </span>
-                </div>
-                <p className="text-slate-700 mb-6 leading-relaxed">{project.description}</p>
-                
-                {/* AI Reasoning Box */}
-                <div className="border-2 border-dashed border-blue-400 bg-blue-50 p-4 relative mt-auto">
-                  <div className="absolute -top-3 left-4 bg-blue-50 px-2 flex items-center gap-2 text-blue-700 font-bold uppercase text-xs tracking-wider">
-                    <BrainCircuit className="w-4 h-4" />
-                    AI Strategic Reasoning
-                  </div>
-                  <p className="font-mono text-sm text-blue-900 leading-relaxed pt-2">
-                    {project.reasoning}
-                  </p>
-                </div>
+      <div className="grid gap-6 px-1">
+        {proposals.map((project) => (
+          <div key={project.id} className="bg-white border-2 border-slate-900 p-6 flex flex-col md:flex-row gap-8 shadow-[8px_8px_0px_0px_rgba(15,23,42,1)] group hover:-translate-y-1 hover:translate-x-1 transition-transform relative overflow-hidden">
+
+            {/* Status Badge */}
+            <div className="absolute top-0 right-0 bg-amber-400 border-l-2 border-b-2 border-slate-900 px-3 py-1 font-mono font-bold text-xs uppercase flex items-center gap-2">
+              <Clock className="w-3 h-3" />
+              {project.status.replace('_', ' ')}
+            </div>
+
+            <div className="flex-1 mt-4">
+              <h3 className="text-2xl font-bold uppercase mb-2 group-hover:text-blue-600 transition-colors line-clamp-1">{project.title}</h3>
+              <p className="text-slate-600 mb-6 font-mono text-sm leading-relaxed max-w-2xl">
+                {project.description}
+              </p>
+              <div className="border-l-4 border-emerald-500 pl-4 py-1 mb-6 bg-slate-50 pr-4">
+                <p className="text-sm font-mono text-slate-700 italic">
+                  "{project.ai_reasoning}"
+                </p>
               </div>
             </div>
 
             {/* Team Matcher */}
-            <div className="p-6 xl:w-1/3 bg-slate-50 flex flex-col">
-              <h4 className="font-bold uppercase text-sm tracking-wider mb-4 flex items-center gap-2">
-                <UsersIcon className="w-4 h-4" />
-                Suggested Team
+            <div className="w-full md:w-72 bg-slate-50 border-2 border-slate-900 p-4 flex flex-col shrink-0">
+              <h4 className="font-bold uppercase tracking-wider text-xs mb-4 flex items-center gap-2 text-slate-500 border-b-2 border-slate-200 pb-2">
+                <Users className="w-4 h-4 text-emerald-600" />
+                Suggested Team ({project.team_assignments?.length || 0})
               </h4>
-              
-              <div className="space-y-3 mb-6 flex-1">
-                {project.suggestedMembers.map(memberId => {
-                  const member = mockMembers.find(m => m.id === memberId);
-                  if (!member) return null;
-                  return (
-                    <div key={member.id} className="flex items-center justify-between bg-white border border-slate-300 p-2">
-                      <div className="flex items-center gap-3">
-                        <img src={member.avatar} alt={member.name} className="w-8 h-8 border border-slate-900" />
-                        <div>
-                          <div className="font-bold text-sm">{member.name}</div>
-                          <div className="font-mono text-[10px] text-slate-500">{member.handle}</div>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => handleRemoveMember(project.id, member.id)}
-                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Remove member"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+              <div className="space-y-3 flex-1">
+                {project.team_assignments?.slice(0, 3).map((assignment: any) => (
+                  <div key={assignment.id} className="flex items-center gap-3 bg-white p-2 border-2 border-slate-100">
+                    <img
+                      src={assignment.member.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${assignment.member.github_id}`}
+                      alt={assignment.member.name}
+                      className="w-10 h-10 border-2 border-slate-900 bg-slate-100"
+                    />
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm truncate uppercase">{assignment.member.name}</p>
+                      <p className="text-xs text-emerald-600 font-mono font-bold truncate">{assignment.role}</p>
                     </div>
-                  );
-                })}
-
-                {/* Search & Add */}
-                <div className="relative mt-4">
-                  <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                    <Search className="h-4 w-4 text-slate-400" />
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Search & Add Member..."
-                    value={searchQueries[project.id] || ''}
-                    onChange={(e) => setSearchQueries({ ...searchQueries, [project.id]: e.target.value })}
-                    className="block w-full pl-8 pr-3 py-2 border border-slate-300 bg-white text-sm font-mono focus:outline-none focus:border-slate-900"
-                  />
-                  {searchQueries[project.id] && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border-2 border-slate-900 shadow-lg max-h-48 overflow-y-auto">
-                      {mockMembers
-                        .filter(m => !project.suggestedMembers.includes(m.id))
-                        .filter(m => m.name.toLowerCase().includes(searchQueries[project.id].toLowerCase()) || m.handle.toLowerCase().includes(searchQueries[project.id].toLowerCase()))
-                        .map(member => (
-                          <button
-                            key={member.id}
-                            onClick={() => handleAddMember(project.id, member.id)}
-                            className="w-full text-left px-3 py-2 hover:bg-slate-100 flex items-center gap-2 border-b border-slate-100 last:border-0"
-                          >
-                            <Plus className="w-4 h-4 text-emerald-600" />
-                            <span className="font-bold text-sm">{member.name}</span>
-                            <span className="font-mono text-[10px] text-slate-500">{member.handle}</span>
-                          </button>
-                        ))}
-                    </div>
-                  )}
-                </div>
+                ))}
               </div>
 
               <div className="mt-auto space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <button 
-                    onClick={() => onViewDetails(project.id)}
-                    className="flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-900 font-bold py-3 px-2 border-2 border-slate-900 transition-colors uppercase tracking-wider text-xs"
+                <div className="mt-4 pt-4 border-t-2 border-slate-200 space-y-2">
+                  <button
+                    onClick={() => onViewDetails(String(project.id))}
+                    className="w-full py-2 bg-white border-2 border-slate-900 font-bold text-xs uppercase tracking-wider hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
                   >
-                    <FileText className="w-4 h-4" />
-                    Details
+                    <BookOpen className="w-4 h-4" />
+                    View Intel
                   </button>
-                  <button 
-                    onClick={() => setRejectingId(project.id)}
-                    className="flex items-center justify-center gap-2 bg-white hover:bg-red-50 text-red-600 font-bold py-3 px-2 border-2 border-slate-900 transition-colors uppercase tracking-wider text-xs"
+                  <button
+                    onClick={() => handleActivate(project.id, project.title)}
+                    disabled={activating === project.title}
+                    className="w-full py-2 bg-slate-900 text-white border-2 border-slate-900 font-bold text-xs uppercase tracking-wider hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group/btn"
                   >
-                    <XCircle className="w-4 h-4" />
-                    Disapprove
+                    {activating === project.title ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4" />
+                        Activate
+                        <ChevronRight className="w-4 h-4 opacity-0 -ml-4 group-hover/btn:opacity-100 group-hover/btn:ml-0 transition-all" />
+                      </>
+                    )}
                   </button>
                 </div>
-                <button 
-                  onClick={() => onActivate(project.title)}
-                  className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 border-2 border-slate-900 transition-colors uppercase tracking-wider text-sm"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                  Activate & Notify
-                </button>
               </div>
             </div>
           </div>
@@ -259,25 +271,4 @@ export function ProjectGenerator({ onActivate, onViewDetails, onShowToast, isLoa
   );
 }
 
-// Simple icon component since we didn't import Users from lucide-react in this file
-function UsersIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
+
