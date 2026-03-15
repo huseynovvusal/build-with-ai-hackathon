@@ -1,6 +1,6 @@
-# Communa AI — Meritocratic Org Intelligence Platform
+# Matcha AI — Meritocratic Org Intelligence Platform
 
-Communa AI is a full-stack platform that maps engineering talent from GitHub activity, computes merit-based contribution signals, and uses AI to generate high-impact project initiatives with team recommendations.
+Matcha AI is a full-stack platform that maps engineering talent from GitHub activity, computes merit-based contribution signals, and uses AI to generate high-impact project initiatives with team recommendations.
 
 The system is designed for organization-scale collaboration:
 - Authenticate contributors through GitHub OAuth
@@ -60,7 +60,7 @@ Backend follows a service-oriented pattern:
 ```text
 build-with-ai-hackathon/
 	backend/
-		communa_auth/         # Django project config
+		Matcha_auth/         # Django project config
 		members/              # Members, proposals, projects domain
 			services/           # AI generation, sync, matching, notifications
 			repositories.py     # Data access helpers
