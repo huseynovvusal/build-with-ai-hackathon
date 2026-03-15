@@ -15,8 +15,6 @@ from members.services import (
     GithubSyncService,
     NotificationService,
     ProjectGeneratorService,
-    NotificationService,
-    ProjectGeneratorService,
     QueryService,
 )
 from members.models import Member
@@ -25,18 +23,40 @@ from members.repositories import ProjectRepository
 
 
 class SyncOrganizationView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     def post(self, request: Request) -> Response:
         org_name = request.data.get("org_name") or "communa-ai"
-        synced_members = GithubSyncService.sync_organization(org_name=org_name)
+        access_token = None
+        if request.user.is_authenticated:
+            try:
+                member = Member.objects.get(user=request.user)
+                access_token = member.github_token or None
+            except Member.DoesNotExist:
+                pass
+
+        synced_members = GithubSyncService.sync_organization(org_name=org_name, access_token=access_token)
         proposals = ProjectGeneratorService.generate_proposals()
+
+        logs = GithubSyncService.get_sync_logs()
+        status_code = status.HTTP_200_OK
+        if len(synced_members) == 0 and any(
+            (
+                "Failed to fetch org members" in log
+                or "No members returned by GitHub API" in log
+            )
+            for log in logs
+        ):
+            status_code = status.HTTP_400_BAD_REQUEST
 
         return Response(
             {
                 "message": "Organization sync completed.",
                 "members_synced": len(synced_members),
                 "proposals_generated": len(proposals),
+                "logs": logs,
             },
-            status=status.HTTP_200_OK,
+            status=status_code,
         )
 
 
@@ -56,6 +76,15 @@ class MemberListView(APIView):
 class ProposalListView(APIView):
     def get(self, request: Request) -> Response:
         proposals = QueryService.list_proposals()
+        serializer = ProjectProposalSerializer(proposals, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ProposalRefreshView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
+    def post(self, request: Request) -> Response:
+        proposals = ProjectGeneratorService.generate_proposals(refresh=True)
         serializer = ProjectProposalSerializer(proposals, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

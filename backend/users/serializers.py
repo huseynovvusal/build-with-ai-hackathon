@@ -21,6 +21,10 @@ class MemberSerializer(serializers.ModelSerializer):
             "roles",
             "top_skills",
             "impact_score",
+            "commits_count",
+            "prs_merged_count",
+            "issues_count",
+            "reviews_count",
         ]
 
 

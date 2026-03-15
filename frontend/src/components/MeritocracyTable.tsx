@@ -135,10 +135,10 @@ export function MeritocracyTable() {
                       </div>
                     </div>
                   </td>
-                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">-</td>
-                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">-</td>
-                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">-</td>
-                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">-</td>
+                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">{Number(member.commits_count || 0)}</td>
+                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">{Number(member.prs_merged_count || 0)}</td>
+                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">{Number(member.issues_count || 0)}</td>
+                  <td className="p-4 border-r-2 border-slate-900 text-right font-mono text-sm text-slate-700">{Number(member.reviews_count || 0)}</td>
                   <td className="p-4 text-right bg-amber-50/30">
                     <div className="flex items-center justify-end gap-3">
                       <TrendingUp className="w-4 h-4 text-emerald-500" />

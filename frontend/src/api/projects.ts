@@ -28,6 +28,14 @@ export const projectsApi = {
     return res.json();
   },
 
+  refreshProposals: async () => {
+    const res = await apiFetch('/proposals/refresh/', {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to refresh proposals');
+    return res.json();
+  },
+
   activateProposal: async (id: number) => {
     const res = await apiFetch(`/proposals/${id}/activate/`, {
       method: 'POST',

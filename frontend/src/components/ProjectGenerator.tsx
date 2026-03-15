@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { mockProjects, mockMembers, Member } from '../mockData';
-import { Target, Users, Zap, CheckCircle2, ChevronRight, BookOpen, Clock, Activity, Plus, XCircle } from 'lucide-react';
+import { Target, Users, Zap, CheckCircle2, ChevronRight, BookOpen, Clock, Activity, Plus, XCircle, RefreshCcw } from 'lucide-react';
 import { projectsApi } from '../api/projects';
 
 interface ProjectGeneratorProps {
@@ -18,6 +18,7 @@ export function ProjectGenerator({ onActivate, onViewDetails, onCreateNew, isLoa
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [activating, setActivating] = useState<string | null>(null);
+  const [refreshingIdeas, setRefreshingIdeas] = useState(false);
 
   useEffect(() => {
     const loadProposals = async () => {
@@ -77,6 +78,20 @@ export function ProjectGenerator({ onActivate, onViewDetails, onCreateNew, isLoa
     }
   };
 
+  const handleRefreshIdeas = async () => {
+    setRefreshingIdeas(true);
+    try {
+      const data = await projectsApi.refreshProposals();
+      setProposals(data);
+      onShowToast('AI generated fresh project ideas.');
+    } catch (err) {
+      console.error(err);
+      onShowToast('Failed to refresh AI ideas.');
+    } finally {
+      setRefreshingIdeas(false);
+    }
+  };
+
   if (loadingProposals || isLoading) {
     return (
       <div className="p-8 h-full flex items-center justify-center">
@@ -95,13 +110,23 @@ export function ProjectGenerator({ onActivate, onViewDetails, onCreateNew, isLoa
           </h2>
           <p className="text-slate-500 font-mono text-sm mt-2">Platform-generated high-impact proposals based on community skill gaps.</p>
         </div>
-        <button
-          onClick={onCreateNew}
-          className="flex items-center gap-2 border-2 border-slate-900 bg-slate-900 text-white font-bold uppercase text-sm tracking-wider px-4 py-2 hover:bg-slate-800 transition-colors shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1"
-        >
-          <Plus className="w-5 h-5" />
-          Create My Own
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRefreshIdeas}
+            disabled={refreshingIdeas}
+            className="flex items-center gap-2 border-2 border-blue-700 bg-blue-600 text-white font-bold uppercase text-sm tracking-wider px-4 py-2 hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            <RefreshCcw className={`w-4 h-4 ${refreshingIdeas ? 'animate-spin' : ''}`} />
+            {refreshingIdeas ? 'Refreshing...' : 'Refresh Ideas'}
+          </button>
+          <button
+            onClick={onCreateNew}
+            className="flex items-center gap-2 border-2 border-slate-900 bg-slate-900 text-white font-bold uppercase text-sm tracking-wider px-4 py-2 hover:bg-slate-800 transition-colors shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1"
+          >
+            <Plus className="w-5 h-5" />
+            Create My Own
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-6 px-1">

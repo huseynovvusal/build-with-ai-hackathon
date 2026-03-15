@@ -4,6 +4,7 @@ from members.views import (
     ActivateProposalView,
     MemberListView,
     ProposalListView,
+    ProposalRefreshView,
     SyncLogsView,
     SyncOrganizationView,
     ProjectListView,
@@ -15,6 +16,7 @@ urlpatterns = [
     path("sync/logs/", SyncLogsView.as_view(), name="sync-logs"),
     path("members/", MemberListView.as_view(), name="member-list"),
     path("proposals/", ProposalListView.as_view(), name="proposal-list"),
+    path("proposals/refresh/", ProposalRefreshView.as_view(), name="proposal-refresh"),
     path(
         "proposals/<int:proposal_id>/activate/",
         ActivateProposalView.as_view(),

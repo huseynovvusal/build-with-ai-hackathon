@@ -16,6 +16,11 @@ class Member(models.Model):
     roles = models.JSONField(default=list, blank=True)
     top_skills = models.JSONField(default=list, blank=True)
     impact_score = models.FloatField(default=0.0)
+    commits_count = models.PositiveIntegerField(default=0)
+    prs_merged_count = models.PositiveIntegerField(default=0)
+    issues_count = models.PositiveIntegerField(default=0)
+    reviews_count = models.PositiveIntegerField(default=0)
+    github_token = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -38,6 +43,10 @@ class ProjectProposal(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
     ai_reasoning = models.TextField()
+    initiatives = models.JSONField(default=list, blank=True)
+    technical_tips = models.JSONField(default=list, blank=True)
+    overall_strategy = models.JSONField(default=list, blank=True)
+    required_dna = models.JSONField(default=list, blank=True)
     status = models.CharField(
         max_length=20,
         choices=Status.choices,

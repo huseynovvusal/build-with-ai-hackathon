@@ -55,6 +55,12 @@ class GithubSyncService:
             cls._sync_logs.append("Invalid response format from GitHub API.")
             return []
 
+        if len(org_members) == 0:
+            cls._sync_logs.append(
+                "No members returned by GitHub API. Organization may be private or membership is hidden."
+            )
+            return []
+
         cls._sync_logs.append(f"Found {len(org_members)} members. Fetching full profiles and scraping repos...")
 
         synced_members: list[Member] = []
@@ -85,7 +91,11 @@ class GithubSyncService:
                 primary_role = profile.get("type") or "Contributor"
                 
                 # Scrape languages/impact score
-                scraped = GitHubScraperService.scrape(username=username, access_token=access_token)
+                scraped = GitHubScraperService.scrape(
+                    username=username,
+                    access_token=access_token,
+                    organization_login=org_name,
+                )
 
                 member = MemberRepository.upsert_member(
                     github_id=github_id,
@@ -98,6 +108,10 @@ class GithubSyncService:
                     roles=[primary_role],
                     top_skills=scraped["top_skills"],
                     impact_score=scraped["impact_score"],
+                    commits_count=int(scraped.get("commits_count", 0) or 0),
+                    prs_merged_count=int(scraped.get("prs_merged_count", 0) or 0),
+                    issues_count=int(scraped.get("issues_count", 0) or 0),
+                    reviews_count=int(scraped.get("reviews_count", 0) or 0),
                 )
                 synced_members.append(member)
                 cls._sync_logs.append(f"Synced member: {name} ({username})")

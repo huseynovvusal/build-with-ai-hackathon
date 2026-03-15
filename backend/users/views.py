@@ -82,9 +82,17 @@ class GitHubCallbackView(APIView):
             print(f"DEBUG [Auth]: Could not fetch organizations: {exc}")
 
         # 3. Scrape repos for skills + impact score
-        scraped = GitHubScraperService.scrape(username=github_login, access_token=gh_token)
+        scraped = GitHubScraperService.scrape(
+            username=github_login,
+            access_token=gh_token,
+            organization_login=organization_login or None,
+        )
         top_skills = scraped["top_skills"]
         impact_score = scraped["impact_score"]
+        commits_count = int(scraped.get("commits_count", 0) or 0)
+        prs_merged_count = int(scraped.get("prs_merged_count", 0) or 0)
+        issues_count = int(scraped.get("issues_count", 0) or 0)
+        reviews_count = int(scraped.get("reviews_count", 0) or 0)
 
         # 4. Upsert Django User + Member (atomic)
         with transaction.atomic():
@@ -104,6 +112,11 @@ class GitHubCallbackView(APIView):
                     "top_skills": top_skills,
                     "roles": [gh_profile.get("type", "Contributor")],
                     "impact_score": impact_score,
+                    "commits_count": commits_count,
+                    "prs_merged_count": prs_merged_count,
+                    "issues_count": issues_count,
+                    "reviews_count": reviews_count,
+                    "github_token": gh_token,
                 },
             )
 

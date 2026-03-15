@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Plus, X, Save, Settings2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../api/auth';
+import { membersApi } from '../api/members';
 
 interface SettingsPanelProps {
   onShowToast: (msg: string) => void;
@@ -14,7 +15,9 @@ export function SettingsPanel({ onShowToast }: SettingsPanelProps) {
   const [roles, setRoles] = useState<string[]>(user?.roles || (user?.role ? [user.role] : []));
   const [newSkill, setNewSkill] = useState('');
   const [newRole, setNewRole] = useState('');
+  const [organizationLogin, setOrganizationLogin] = useState(user?.organization_login || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncingOrg, setIsSyncingOrg] = useState(false);
 
   const normalizedSkills = useMemo(
     () => skills.map((s) => s.trim()).filter(Boolean),
@@ -57,6 +60,7 @@ export function SettingsPanel({ onShowToast }: SettingsPanelProps) {
         top_skills: normalizedSkills,
         roles: normalizedRoles,
         role: normalizedRoles[0] || '',
+        organization_login: organizationLogin.trim(),
       });
       updateUser(updated);
       onShowToast('Settings saved successfully.');
@@ -65,6 +69,28 @@ export function SettingsPanel({ onShowToast }: SettingsPanelProps) {
       onShowToast('Failed to save settings.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleOrganizationSync = async () => {
+    const org = organizationLogin.trim();
+    if (!org) {
+      onShowToast('Please enter organization login first.');
+      return;
+    }
+
+    setIsSyncingOrg(true);
+    try {
+      const updated = await authApi.updateMe({ organization_login: org });
+      updateUser(updated);
+
+      const result = await membersApi.syncOrganization(org);
+      onShowToast(`Synced ${result.members_synced || 0} members from ${org}.`);
+    } catch (err) {
+      console.error(err);
+      onShowToast((err as Error)?.message || 'Organization sync failed. Check org login and access.');
+    } finally {
+      setIsSyncingOrg(false);
     }
   };
 
@@ -79,6 +105,29 @@ export function SettingsPanel({ onShowToast }: SettingsPanelProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="border-2 border-slate-900 bg-white p-5 lg:col-span-2">
+          <h3 className="text-sm font-bold uppercase tracking-wider mb-4">Organization</h3>
+          <div className="flex flex-col md:flex-row gap-2">
+            <input
+              value={organizationLogin}
+              onChange={(e) => setOrganizationLogin(e.target.value)}
+              className="flex-1 border-2 border-slate-900 px-3 py-2 text-sm"
+              placeholder="GitHub org login (e.g. microsoft)"
+            />
+            <button
+              onClick={handleOrganizationSync}
+              disabled={isSyncingOrg}
+              className="px-4 py-2 border-2 border-slate-900 bg-blue-600 text-white font-bold uppercase text-xs disabled:opacity-50"
+              type="button"
+            >
+              {isSyncingOrg ? 'Syncing...' : 'Sync Members'}
+            </button>
+          </div>
+          <p className="text-xs font-mono text-slate-500 mt-2">
+            If auto-detection is empty, set org login manually and sync all members.
+          </p>
+        </div>
+
         <div className="border-2 border-slate-900 bg-white p-5">
           <h3 className="text-sm font-bold uppercase tracking-wider mb-4">Skills</h3>
           <div className="flex gap-2 mb-4">

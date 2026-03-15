@@ -18,6 +18,10 @@ class MemberSerializer(serializers.ModelSerializer):
             "roles",
             "top_skills",
             "impact_score",
+            "commits_count",
+            "prs_merged_count",
+            "issues_count",
+            "reviews_count",
         ]
 
 
@@ -39,6 +43,10 @@ class ProjectProposalSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "ai_reasoning",
+            "initiatives",
+            "technical_tips",
+            "overall_strategy",
+            "required_dna",
             "status",
             "team_assignments",
             "created_at",
