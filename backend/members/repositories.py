@@ -19,15 +19,26 @@ class MemberRepository:
         name: str,
         bio: str,
         avatar_url: str,
+        company: str = "",
+        organization_login: str = "",
+        role: str = "",
+        roles: list[str] | None = None,
         top_skills: list[str],
         impact_score: float,
     ) -> Member:
+        if roles is None:
+            roles = [role] if role else []
+
         member, _ = Member.objects.update_or_create(
             github_id=github_id,
             defaults={
                 "name": name,
                 "bio": bio,
                 "avatar_url": avatar_url,
+                "company": company,
+                "organization_login": organization_login,
+                "role": role,
+                "roles": roles,
                 "top_skills": top_skills,
                 "impact_score": impact_score,
             },

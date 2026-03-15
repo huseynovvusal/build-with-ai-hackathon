@@ -10,6 +10,10 @@ class Member(models.Model):
     name = models.CharField(max_length=255)
     bio = models.TextField(blank=True)
     avatar_url = models.URLField(max_length=500, blank=True)
+    company = models.CharField(max_length=255, blank=True)
+    organization_login = models.CharField(max_length=255, blank=True)
+    role = models.CharField(max_length=255, blank=True)
+    roles = models.JSONField(default=list, blank=True)
     top_skills = models.JSONField(default=list, blank=True)
     impact_score = models.FloatField(default=0.0)
 

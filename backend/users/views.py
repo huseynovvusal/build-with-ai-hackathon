@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from members.models import Member
+from members.services import GithubSyncService
 from users.github_oauth import GitHubOAuthService
 from users.github_scraper import GitHubScraperService
 from users.serializers import MemberSerializer, AuthResponseSerializer
@@ -69,6 +70,16 @@ class GitHubCallbackView(APIView):
         name = gh_profile.get("name") or github_login
         bio = gh_profile.get("bio") or ""
         avatar_url = gh_profile.get("avatar_url", "")
+        company = gh_profile.get("company") or ""
+
+        # 2.1 Fetch organizations and pick the first available org
+        organization_login = ""
+        try:
+            orgs = GitHubOAuthService.get_user_orgs(gh_token)
+            if orgs:
+                organization_login = orgs[0].get("login", "")
+        except Exception as exc:
+            print(f"DEBUG [Auth]: Could not fetch organizations: {exc}")
 
         # 3. Scrape repos for skills + impact score
         scraped = GitHubScraperService.scrape(username=github_login, access_token=gh_token)
@@ -88,10 +99,22 @@ class GitHubCallbackView(APIView):
                     "name": name,
                     "bio": bio,
                     "avatar_url": avatar_url,
+                    "company": company,
+                    "organization_login": organization_login,
                     "top_skills": top_skills,
+                    "roles": [gh_profile.get("type", "Contributor")],
                     "impact_score": impact_score,
                 },
             )
+
+        # 4.1 Sync all members from the same organization, if available
+        if organization_login:
+            try:
+                GithubSyncService.sync_organization(org_name=organization_login, access_token=gh_token)
+                # Reload self member after org sync in case upsert updated it
+                member = Member.objects.get(github_id=github_id)
+            except Exception as exc:
+                print(f"DEBUG [Auth]: Organization sync failed for {organization_login}: {exc}")
 
         # 5. Issue JWT
         tokens = _get_tokens_for_user(user)
@@ -120,5 +143,34 @@ class MeView(APIView):
             member = Member.objects.get(user=request.user)
         except Member.DoesNotExist:
             return Response({"error": "Member profile not found"}, status=status.HTTP_404_NOT_FOUND)
+        serializer = MemberSerializer(member)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request: Request) -> Response:
+        try:
+            member = Member.objects.get(user=request.user)
+        except Member.DoesNotExist:
+            return Response({"error": "Member profile not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        member.name = request.data.get("name", member.name)
+        member.bio = request.data.get("bio", member.bio)
+        member.company = request.data.get("company", member.company)
+        member.role = request.data.get("role", member.role)
+        member.organization_login = request.data.get("organization_login", member.organization_login)
+        
+        if "top_skills" in request.data:
+            skills = request.data.get("top_skills") or []
+            if isinstance(skills, list):
+                member.top_skills = [str(skill).strip() for skill in skills if str(skill).strip()]
+
+        if "roles" in request.data:
+            roles = request.data.get("roles") or []
+            if isinstance(roles, list):
+                member.roles = [str(role).strip() for role in roles if str(role).strip()]
+                if member.roles and not member.role:
+                    member.role = member.roles[0]
+            
+        member.save()
+
         serializer = MemberSerializer(member)
         return Response(serializer.data, status=status.HTTP_200_OK)

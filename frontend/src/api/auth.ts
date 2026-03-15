@@ -24,4 +24,16 @@ export const authApi = {
     if (!res.ok) throw new Error('Failed to fetch user');
     return res.json();
   },
+
+  updateMe: async (payload: Record<string, any>) => {
+    const res = await apiFetch('/auth/me/', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to update profile');
+    }
+    return res.json();
+  },
 };

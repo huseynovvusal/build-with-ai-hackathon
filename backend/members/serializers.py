@@ -12,6 +12,10 @@ class MemberSerializer(serializers.ModelSerializer):
             "name",
             "bio",
             "avatar_url",
+            "company",
+            "organization_login",
+            "role",
+            "roles",
             "top_skills",
             "impact_score",
         ]

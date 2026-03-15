@@ -9,6 +9,7 @@ class GitHubOAuthService:
 
     TOKEN_URL = "https://github.com/login/oauth/access_token"
     USER_URL = "https://api.github.com/user"
+    USER_ORGS_URL = "https://api.github.com/user/orgs"
 
     @classmethod
     def exchange_code(cls, code: str) -> dict:
@@ -43,3 +44,19 @@ class GitHubOAuthService:
         response.raise_for_status()
         return response.json()
         # Returns: id, login, name, bio, avatar_url, public_repos, followers, etc.
+
+    @classmethod
+    def get_user_orgs(cls, access_token: str) -> list[dict]:
+        """Fetch organizations for authenticated GitHub user."""
+        response = requests.get(
+            cls.USER_ORGS_URL,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/vnd.github+json",
+            },
+            params={"per_page": 100},
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data if isinstance(data, list) else []

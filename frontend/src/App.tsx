@@ -10,8 +10,9 @@ import { useAuth } from './context/AuthContext';
 import { GitHubCallback } from './components/GitHubCallback';
 import { CreateProject } from './components/CreateProject';
 import { BrainCircuit } from 'lucide-react';
+import { SettingsPanel } from './components/SettingsPanel';
 
-type TabState = 'members' | 'projects' | 'meritocracy' | 'create_project';
+type TabState = 'members' | 'projects' | 'meritocracy' | 'create_project' | 'settings';
 
 export default function App() {
   const { user, token, isLoading: isAuthLoading, logout } = useAuth();
@@ -63,6 +64,8 @@ export default function App() {
           <MemberGrid />
         ) : activeTab === 'meritocracy' ? (
           <MeritocracyTable />
+        ) : activeTab === 'settings' ? (
+          <SettingsPanel onShowToast={setToastMessage} />
         ) : activeTab === 'create_project' ? (
           <CreateProject onCreated={() => handleTabChange('projects')} onShowToast={setToastMessage} />
         ) : selectedProjectId ? (

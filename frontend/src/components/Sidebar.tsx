@@ -3,8 +3,8 @@ import { Users, Library, Activity, Settings, LogOut, PlusCircle, Trophy, FolderK
 import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
-  activeTab: 'members' | 'projects' | 'meritocracy' | 'create_project';
-  setActiveTab: (tab: 'members' | 'projects' | 'meritocracy' | 'create_project') => void;
+  activeTab: 'members' | 'projects' | 'meritocracy' | 'create_project' | 'settings';
+  setActiveTab: (tab: 'members' | 'projects' | 'meritocracy' | 'create_project' | 'settings') => void;
   onLogout: () => void;
 }
 
@@ -19,7 +19,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout }: SidebarProps) {
           <h1 className="text-xl font-bold tracking-tight uppercase">Communa AI</h1>
         </div>
         <div className="mt-4 inline-block px-2 py-1 border border-slate-900 bg-slate-100 text-[10px] font-mono uppercase font-bold tracking-wider">
-          ORG: BANM-OpenSource
+          ORG: {user?.organization_login || 'N/A'}
         </div>
       </div>
 
@@ -60,7 +60,14 @@ export function Sidebar({ activeTab, setActiveTab, onLogout }: SidebarProps) {
           Meritocracy
         </button>
 
-        <button className="w-full mt-auto flex items-center gap-3 px-4 py-3 font-bold uppercase text-sm border-2 border-transparent text-slate-600 hover:border-slate-300 hover:bg-slate-100 transition-colors">
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`w-full mt-auto flex items-center gap-3 px-4 py-3 font-bold uppercase text-sm border-2 transition-colors ${
+            activeTab === 'settings'
+              ? 'bg-slate-900 text-white border-slate-900'
+              : 'border-transparent text-slate-600 hover:border-slate-300 hover:bg-slate-100'
+          }`}
+        >
           <Settings className="w-5 h-5" />
           Settings
         </button>
