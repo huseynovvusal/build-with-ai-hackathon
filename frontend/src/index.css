@@ -1,0 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-slate-900 font-sans antialiased;
+  }
+  
+  /* Industrial styling overrides */
+  * {
+    @apply border-slate-900;
+  }
+}
+
+/* Custom scrollbar for terminal */
+.terminal-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.terminal-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9; 
+  border-left: 1px solid #0f172a;
+}
+.terminal-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1; 
+  border: 1px solid #0f172a;
+}
+.terminal-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; 
+}
